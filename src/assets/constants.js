@@ -1,0 +1,1 @@
+export const avatar='https://firebasestorage.googleapis.com/v0/b/final-year-project-45240.appspot.com/o/avatar.jpeg?alt=media&token=412aaa98-ef65-4ee4-8ce6-09a19982874b'

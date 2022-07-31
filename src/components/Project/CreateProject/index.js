@@ -14,11 +14,15 @@ import styles from './createProjectStyle';
 import {combineData} from '../../../utils/DataHelper';
 import {AuthContext} from '../../../context';
 import {db, auth} from '../../../Backend/firebaseConfig';
-
+import {getAllOfCollection} from '../../../Backend/utility';
 import {docIdGenerator} from '../../../Backend/utility';
 export function CreateProject() {
   const {state, dispatch} = useContext(AuthContext);
   const {members} = state;
+  const [projects, setProjects] = useState([]);
+  useEffect(() => {
+    projectList();
+  }, []);
   const [data, setData] = useState({
     newProject: {title: '', description: '', selectedMembers: []},
   });
@@ -67,14 +71,63 @@ export function CreateProject() {
     return value;
   };
 
+  const projectList = () => {
+    const loggedInUser = auth.currentUser.uid;
+    console.log('Logged in user id is', loggedInUser);
+    getAllOfCollection('projects').then(projects => {
+      console.log(projects.length);
+      setProjects(projects);
+    });
+  };
   const createProject = () => {
     // persist data to database
-
-    setSaving(true);
     try {
+      setSaving(true);
+
       let {newProject} = data;
 
       const docId = docIdGenerator('projects');
+      let filteredByDesignation = [
+        ...members
+          .filter(member => member.designation)
+          .map(a => ({...a, designation: a.designation.toLowerCase()})),
+      ];
+      // fetch all users : members
+      // check for designation
+      filteredByDesignation = filteredByDesignation.filter(member =>
+        member.designation.includes(newProject.title.trim()),
+      );
+      console.log({filteredByDesignation});
+      //  if it matches the input value of project
+      // second check will if this user is not included in team array of any other projects
+      console.log(projects.length);
+      let teamIds = [];
+      teamIds = projects
+        .filter(project => {
+          return project.team;
+        })
+        .map(project => project.team);
+      console.log('first ', teamIds[0]);
+      teamIds.forEach(team => {
+        team = team.map(user => user.id);
+        // teamIds.push([...teamIds,...team]);
+        teamIds = [...teamIds, ...team];
+      });
+
+      teamIds = teamIds.filter(i => typeof i === 'string');
+      projects.forEach(pro => {
+        if (pro.team) {
+          pro.team.forEach(i => {
+            if (teamIds.includes(i.id)) {
+              let toBeDeleted = teamIds.findIndex(t => t === i.id);
+              teamIds.splice(toBeDeleted, 1);
+              console.log(teamIds);
+            }
+          });
+        }
+      });
+
+      teamIds = members.filter(mem => teamIds.includes(mem.id));
 
       db.collection('projects')
         .doc(docId)
@@ -82,7 +135,7 @@ export function CreateProject() {
           id: docId,
           title: newProject.title,
           description: newProject.description,
-          team: newProject.selectedMembers,
+          team: teamIds,
           progress: 0,
           createdAt: new Date(),
           tasks: 0,
@@ -131,7 +184,7 @@ export function CreateProject() {
         style={styles.textInput}
         onChangeText={text => handleSetValue('description', text)}
       />
-      <View style={styles.teamTextWrapper}>
+      {/* <View style={styles.teamTextWrapper}>
         <Text style={styles.teamText}>Select Members</Text>
       </View>
       <View style={styles.teamSection}>
@@ -162,7 +215,7 @@ export function CreateProject() {
             ))}
           </View>
         </ScrollView>
-      </View>
+      </View> */}
       <TouchableOpacity
         style={styles.btnWrapper}
         onPress={() => createProject()}>
